@@ -27,7 +27,12 @@ type Owners struct {
 	PrincipalStoreURL       string
 	NoteboardURL            string
 	WorkGraphStoreURL       string
+	BridgeURL               string
+	BridgeServiceToken      string
 }
+
+// BridgeServiceTokenHeader is how llm-bridge-server recognises an internal service.
+const BridgeServiceTokenHeader = "X-LLM-Bridge-Service-Token"
 
 // KanbanServiceTokenHeader is how kanban-store recognises an internal service.
 const KanbanServiceTokenHeader = "X-Kanban-Store-Service-Token"
@@ -119,6 +124,12 @@ func (owners *Owners) Label(ctx context.Context, entityType, entityRef string) (
 		}
 		err = owners.getJSON(ctx, owners.NoteboardURL+"/api/items/"+escaped, nil, &item)
 		label = item.Title
+	case EntitySession:
+		var session struct {
+			DisplayName string `json:"display_name"`
+		}
+		err = owners.getJSON(ctx, owners.BridgeURL+"/sessions/"+escaped, map[string]string{BridgeServiceTokenHeader: owners.BridgeServiceToken}, &session)
+		label = session.DisplayName
 	default:
 		return "", fmt.Errorf("%w: entity_type %q is not one a project can own", ErrInvalid, entityType)
 	}

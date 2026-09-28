@@ -275,12 +275,14 @@ func (handlers *Handlers) deleteLink(writer http.ResponseWriter, request *http.R
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-// findLinks is the reverse lookup: which projects own this entity.
+// findLinks is the reverse lookup: which projects own this entity, or, without
+// entity_ref, every link of one type (every filed session, to group a list of
+// sessions by project in one call).
 func (handlers *Handlers) findLinks(writer http.ResponseWriter, request *http.Request) {
 	query := request.URL.Query()
 	filter := LinkFilter{EntityType: query.Get("entity_type"), EntityRef: query.Get("entity_ref")}
-	if filter.EntityType == "" || filter.EntityRef == "" {
-		writeError(writer, fmt.Errorf("%w: entity_type and entity_ref are required", ErrInvalid))
+	if filter.EntityType == "" {
+		writeError(writer, fmt.Errorf("%w: entity_type is required", ErrInvalid))
 		return
 	}
 	links, err := handlers.Store.Links(filter)

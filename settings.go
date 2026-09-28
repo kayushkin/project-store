@@ -29,6 +29,8 @@ const (
 	SettingPrincipalStoreURL       = "principal_store_url"
 	SettingNoteboardURL            = "noteboard_url"
 	SettingWorkGraphStoreURL       = "work_graph_store_url"
+	SettingBridgeURL               = "bridge_url"
+	SettingBridgeServiceToken      = "bridge_service_token"
 )
 
 // DefaultListenAddress is where the service listens with nothing set.
@@ -71,6 +73,10 @@ func SettingDefinitions() []servicesettings.Definition {
 			"noteboard. A note linked to a project (a decision, a design) is checked there."),
 		wiring(SettingWorkGraphStoreURL, "PROJECT_STORE_WORK_GRAPH_STORE_URL", "http://127.0.0.1:8319",
 			"work-graph-store. A project's branches, and the sessions that moved them, are read there for its repos."),
+		wiring(SettingBridgeURL, "PROJECT_STORE_BRIDGE_URL", "http://localhost:8160",
+			"llm-bridge-server. A session filed under a project is checked there."),
+		{Key: SettingBridgeServiceToken, EnvironmentVariable: "LLMBRIDGE_SERVICE_TOKEN", Kind: msg.ServiceSettingKindSecret, ValueType: msg.ServiceSettingValueTypeString, Required: true,
+			Description: "The token llm-bridge-server takes from an internal service. Without it every session check is 401, so the service refuses to start."},
 	}
 }
 

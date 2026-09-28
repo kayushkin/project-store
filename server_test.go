@@ -37,6 +37,12 @@ func fakeOwners(t *testing.T) *Owners {
 				{"name":"old","head_sha":"c","merged_into_default":true}]}`))
 		case "/deployments":
 			writer.Write([]byte(`[{"commit_sha":"abc","deployed_by":"someone","created_at":50}]`))
+		case "/sessions/br_1790000000000000001":
+			if request.Header.Get(BridgeServiceTokenHeader) != "bridge-token" {
+				http.Error(writer, "no token", http.StatusUnauthorized)
+				return
+			}
+			json.NewEncoder(writer).Encode(map[string]any{"session_id": "br_1790000000000000001", "display_name": "Discord signup UI"})
 		case "/api/jobs/500":
 			http.Error(writer, "boom", http.StatusInternalServerError)
 		default:
@@ -49,7 +55,7 @@ func fakeOwners(t *testing.T) *Owners {
 	}))
 	t.Cleanup(server.Close)
 	return &Owners{HTTP: server.Client(), RepoStoreURL: server.URL, KanbanStoreURL: server.URL, KanbanStoreServiceToken: "service-token",
-		SchedulerURL: server.URL, HealthcheckURL: server.URL, PrincipalStoreURL: server.URL, NoteboardURL: server.URL, WorkGraphStoreURL: server.URL}
+		SchedulerURL: server.URL, HealthcheckURL: server.URL, PrincipalStoreURL: server.URL, NoteboardURL: server.URL, WorkGraphStoreURL: server.URL, BridgeURL: server.URL, BridgeServiceToken: "bridge-token"}
 }
 
 type client struct {
@@ -150,6 +156,16 @@ func TestALinkIsCheckedWithItsOwnerAndCarriesItsName(t *testing.T) {
 	c.do("POST", "/projects/project_000001/links", `{"entity_type":"scheduler_job","entity_ref":"500"}`, http.StatusBadGateway)
 	c.do("POST", "/projects/project_000001/links", `{"entity_type":"spaceship","entity_ref":"1"}`, http.StatusBadRequest)
 	c.do("POST", "/projects/project_000404/links", `{"entity_type":"repo","entity_ref":"15"}`, http.StatusNotFound)
+
+	session := c.do("POST", "/projects/project_000002/links", `{"entity_type":"session","entity_ref":"br_1790000000000000001"}`, http.StatusCreated)
+	if session["label"] != "Discord signup UI" {
+		t.Errorf("session link label = %v", session["label"])
+	}
+	c.do("POST", "/projects/project_000002/links", `{"entity_type":"session","entity_ref":"br_1"}`, http.StatusBadRequest)
+	if filed := c.do("GET", "/links?entity_type=session", "", http.StatusOK)["links"].([]any); len(filed) != 1 {
+		t.Errorf("every filed session = %v", filed)
+	}
+	c.do("GET", "/links?entity_ref=15", "", http.StatusBadRequest)
 
 	owners := c.do("GET", "/links?entity_type=repo&entity_ref=15", "", http.StatusOK)["links"].([]any)
 	if len(owners) != 2 {

@@ -2,7 +2,7 @@
 
 ## What it owns
 
-`127.0.0.1:8320`, unit `project-store.service`. Projects: what each is for (name, kind `project` or `stream`, goal, what done means, stage, spend target, parent project) and what it owns in other stores — repos, boards, scheduler jobs, services, people, notes — each by the id its own store gave it. Ids are `project_000001`. `CONTRACT.md` is the route table.
+`127.0.0.1:8320`, unit `project-store.service`. Projects: what each is for (name, kind `project` or `stream`, goal, what done means, stage, spend target, parent project) and what it owns in other stores — repos, boards, scheduler jobs, services, people, notes, filed sessions — each by the id its own store gave it. Ids are `project_000001`. `CONTRACT.md` is the route table.
 
 It stores nothing that happens in a project. Cards, branches, sessions, deploys and spend are worked out on request (`/projects/{id}/rollup`, `/digest`) from what the project owns and from the cards kanban-store links to it, so they are never stale here.
 
@@ -14,7 +14,7 @@ A project may own several boards and a board may show cards from several project
 
 ## Every link is checked with its owner
 
-`POST /projects/{id}/links` asks the owning store for the id before writing it (`owners.go`) and keeps the store's name as `label`, for display only: nothing reads a label back to find a row. The owner saying no is 400, the owner not answering is 502, and nothing is written in either case. kanban-store needs `KANBAN_STORE_SERVICE_TOKEN`, which the service reads from a host-local drop-in (`~/.config/systemd/user/project-store.service.d/`) and refuses to start without.
+`POST /projects/{id}/links` asks the owning store for the id before writing it (`owners.go`) and keeps the store's name as `label`, for display only: nothing reads a label back to find a row. The owner saying no is 400, the owner not answering is 502, and nothing is written in either case. kanban-store needs `KANBAN_STORE_SERVICE_TOKEN` and llm-bridge-server `LLMBRIDGE_SERVICE_TOKEN`, which the service reads from a host-local drop-in (`~/.config/systemd/user/project-store.service.d/`) and refuses to start without.
 
 # Working in this repo
 

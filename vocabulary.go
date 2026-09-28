@@ -27,6 +27,7 @@ const (
 	EntityService      = "service"       // healthcheck's check name, its key there
 	EntityPrincipal    = "principal"     // principal-store id, principal_000001
 	EntityNote         = "note"          // noteboard item uuid: a decision, a design
+	EntitySession      = "session"       // llm-bridge-server session id, br_…
 )
 
 // EntityTypeInfo describes a linkable entity type.
@@ -44,6 +45,7 @@ var EntityTypes = []EntityTypeInfo{
 	{EntityService, "healthcheck", "A running service the project keeps up; healthcheck's check name."},
 	{EntityPrincipal, "principal-store", "A person or group the project serves or works with; principal-store's id."},
 	{EntityNote, "noteboard", "A note that records a decision or a design; the noteboard item's uuid."},
+	{EntitySession, "llm-bridge-server", "A session filed under the project: a chat about it, or a worker on it; llm-bridge-server's id. Filing is for sessions no card or branch ties to the project already."},
 }
 
 func entityTypeKnown(entityType string) bool {

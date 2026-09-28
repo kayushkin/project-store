@@ -17,7 +17,7 @@ with a field the route does not take is 400. Times are unix seconds.
 | `GET` | `/projects/{id}/links` | `{"links":[…]}` what the project owns; `?entity_type=` narrows |
 | `POST` | `/projects/{id}/links` | `{"entity_type":…,"entity_ref":…,"note":…,"created_by":…}`. The ref is checked with its own store first: **400** when that store has no such thing, **502** when it cannot answer, **409** when the project already owns it. `label` is that store's name for it, kept for display |
 | `DELETE` | `/projects/{id}/links/{link_id}` | **204** |
-| `GET` | `/links?entity_type=…&entity_ref=…` | Reverse lookup: which projects own this. Both required |
+| `GET` | `/links?entity_type=…&entity_ref=…` | Reverse lookup: which projects own this. `entity_type` is required; without `entity_ref` it lists every link of that type (every filed session, to group sessions by project in one call) |
 | `GET` | `/projects/{id}/rollup` | Worked out on request: `project`, `children`, `links`, `cards` (every card kanban-store links to the project: `card_id`, `title`, noteboard `status`, kanban `work_state`), `cards_by_work_state` (open cards only; `unmapped` when the card's column has no state), and `repos` (each owned repo's `unmerged_branches` from work-graph-store and `latest_deploy` from repo-store's ledger). A store that cannot answer fails the whole call |
 | `GET` | `/digest` | Every live project's rollup as `text/plain` for an agent: one block each, children indented under their parent |
 
@@ -25,8 +25,10 @@ with a field the route does not take is 400. Times are unix seconds.
 
 `entity_type` is one of `repo` (repo-store's numeric id), `board` (kanban-store
 board uuid), `scheduler_job` (scheduler job id), `service` (healthcheck check
-name), `principal` (principal-store id) and `note` (noteboard item uuid). One
-thing may belong to several projects.
+name), `principal` (principal-store id), `note` (noteboard item uuid) and
+`session` (llm-bridge-server session id: a chat about the project, or a worker
+on it, filed because no card or branch ties it there already). One thing may
+belong to several projects.
 
 A **card** is not linked here. kanban-store holds card links, so a card joins a
 project with `POST …/kanban/api/cards/{card_id}/links

@@ -39,6 +39,8 @@ func main() {
 		PrincipalStoreURL:       settings.String(projectstore.SettingPrincipalStoreURL),
 		NoteboardURL:            settings.String(projectstore.SettingNoteboardURL),
 		WorkGraphStoreURL:       settings.String(projectstore.SettingWorkGraphStoreURL),
+		BridgeURL:               settings.String(projectstore.SettingBridgeURL),
+		BridgeServiceToken:      settings.String(projectstore.SettingBridgeServiceToken),
 	}
 
 	mux := http.NewServeMux()
