@@ -248,7 +248,11 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 			if link.EntityType == EntityRepo {
 				continue
 			}
-			owned[link.EntityType] = append(owned[link.EntityType], fmt.Sprintf("%s (%s)", link.Label, link.EntityRef))
+			shown := link.EntityRef
+			if link.Label != "" && link.Label != link.EntityRef {
+				shown = fmt.Sprintf("%s (%s)", link.Label, link.EntityRef)
+			}
+			owned[link.EntityType] = append(owned[link.EntityType], shown)
 		}
 		for _, entityType := range []string{EntityBoard, EntitySchedulerJob, EntityService, EntityPrincipal, EntityNote} {
 			if len(owned[entityType]) > 0 {
