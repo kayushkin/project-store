@@ -244,7 +244,12 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 			fmt.Fprintf(&text, "%s  cards: %s\n", indent, strings.Join(states, ", "))
 		}
 		owned := map[string][]string{}
+		filedSessions := 0
 		for _, link := range rollup.Links {
+			if link.EntityType == EntitySession {
+				filedSessions++
+				continue
+			}
 			if link.EntityType == EntityRepo {
 				continue
 			}
@@ -258,6 +263,10 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 			if len(owned[entityType]) > 0 {
 				fmt.Fprintf(&text, "%s  %ss: %s\n", indent, strings.ReplaceAll(entityType, "_", " "), strings.Join(owned[entityType], ", "))
 			}
+		}
+		if filedSessions > 0 {
+			// Only the count: GET /projects/{id}/links?entity_type=session names them.
+			fmt.Fprintf(&text, "%s  filed sessions: %d\n", indent, filedSessions)
 		}
 		for _, repo := range rollup.Repos {
 			fmt.Fprintf(&text, "%s  repo %s (%d)", indent, repo.Name, repo.RepoStoreID)
