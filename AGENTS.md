@@ -20,4 +20,6 @@ A project may own several boards and a board may show cards from several project
 
 ## Tests and deploys
 
+The wire types are rendered to TypeScript in `ts/model.ts` (`@kayushkin/project-store-types`, which bridge-ui links) by `./generate-ts.sh` from the files `tygo.yaml` names; run it after changing a wire type and commit the result. The list answers (`{"projects":[…]}`, `{"links":[…]}`) are unnamed maps in `server.go`, so they are not rendered; a caller wraps the named element type. `store.go` holds some internals too, and tygo renders them; nothing reads them.
+
 `go test ./...`; `server_test.go` runs every route against fake owners. Deploy only with `./deploy.sh`, which refuses when the token drop-in is missing and smoke-checks `/digest`, the call that reaches every owner.
