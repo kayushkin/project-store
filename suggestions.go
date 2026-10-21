@@ -172,7 +172,7 @@ var suggestionSchema = json.RawMessage(fmt.Sprintf(`{"type":"object","properties
 "why":{"type":"string","description":"One or two sentences: what in the project's state calls for this step."}},
 "required":["title","why"]}}},"required":["suggestions"]}`, MaximumSuggestions))
 
-const suggestionSystemPrompt = `You help one person run their software projects on a single host. Given one project's goal, what "done" means for it, and where its work stands, propose the next steps that would move it toward done most. Prefer steps that finish work already started (unmerged branches, open pull requests, undeployed commits, open todos waiting on something) over new work. Never repeat a step already listed as an open todo or card. Each step must be something one agent session could do or decide. Write plainly; no figures of speech.`
+const suggestionSystemPrompt = `You help one person run their software projects on a single host. Given one project's goal, what "done" means for it, and where its work stands, propose the next steps that would move it toward done most. Prefer steps that finish work already started (unmerged branches, open pull requests, undeployed commits, open todos waiting on something) over new work. Never repeat a step already listed as an open todo or card. Each step must be something one agent session could do or decide. A repo that was "never deployed" is often a library that goes live inside another repo's deploy, so do not propose deploying it on that ground alone. Write plainly; no figures of speech.`
 
 // SuggestionPrompt is what the model reads about the project.
 func SuggestionPrompt(rollup Rollup, activity []ActivityEvent, now time.Time) string {
