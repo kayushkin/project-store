@@ -22,7 +22,7 @@ func RegisterHandlers(mux *http.ServeMux, handlers *Handlers) {
 		writeJSON(writer, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("GET /vocabulary", func(writer http.ResponseWriter, _ *http.Request) {
-		writeJSON(writer, http.StatusOK, map[string]any{"kinds": Kinds, "stages": Stages, "default_stage": DefaultStage, "entity_types": EntityTypes})
+		writeJSON(writer, http.StatusOK, map[string]any{"kinds": Kinds, "stages": Stages, "activity_kinds": ActivityKinds, "suggestion_statuses": SuggestionStatuses, "default_stage": DefaultStage, "entity_types": EntityTypes})
 	})
 	mux.HandleFunc("GET /projects", handlers.listProjects)
 	mux.HandleFunc("GET /digest", handlers.digest)
@@ -35,6 +35,12 @@ func RegisterHandlers(mux *http.ServeMux, handlers *Handlers) {
 	mux.HandleFunc("POST /projects/{id}/links", handlers.addLink)
 	mux.HandleFunc("DELETE /projects/{id}/links/{link_id}", handlers.deleteLink)
 	mux.HandleFunc("GET /links", handlers.findLinks)
+	mux.HandleFunc("GET /projects/{id}/activity", handlers.projectActivity)
+	mux.HandleFunc("POST /projects/{id}/next-steps", handlers.addNextStep)
+	mux.HandleFunc("GET /projects/{id}/suggestions", handlers.listSuggestions)
+	mux.HandleFunc("POST /projects/{id}/suggestions", handlers.requestSuggestions)
+	mux.HandleFunc("POST /suggestions/{suggestion_id}/accept", handlers.acceptSuggestion)
+	mux.HandleFunc("POST /suggestions/{suggestion_id}/dismiss", handlers.dismissSuggestion)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {

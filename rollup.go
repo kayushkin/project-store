@@ -2,6 +2,7 @@ package projectstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -34,6 +35,51 @@ type RepoRollup struct {
 	UnmergedBranches []UnmergedBranch `json:"unmerged_branches"`
 	// LatestDeploy is nil when the ledger has no deploy of the repo.
 	LatestDeploy *Deploy `json:"latest_deploy"`
+	// RecentCommits are the default branch's commits of the last
+	// RecentCommitWindow, newest first, following first parents, at most
+	// RecentCommitLimit of them.
+	RecentCommits []Commit `json:"recent_commits"`
+	// OpenPullRequests are repo-store's open pull requests of the repo.
+	OpenPullRequests []PullRequest `json:"open_pull_requests"`
+}
+
+// RecentCommitWindow is how far back a rollup's recent commits reach.
+const RecentCommitWindow = 14 * 24 * time.Hour
+
+// RecentCommitLimit caps a rollup's recent commits for one repo.
+const RecentCommitLimit = 50
+
+// Commit is one commit from work-graph-store's graph of a repo.
+type Commit struct {
+	SHA         string `json:"sha"`
+	Subject     string `json:"subject"`
+	AuthorName  string `json:"author_name"`
+	CommittedAt int64  `json:"committed_at"`
+	// SessionID is the session work-graph-store saw make the commit; "" when
+	// it saw none.
+	SessionID string `json:"session_id"`
+	// OnOriginBranch is true when a branch of the origin remote contains it.
+	OnOriginBranch bool `json:"on_origin_branch"`
+}
+
+// PullRequest is a GitHub pull request as repo-store keeps it.
+type PullRequest struct {
+	RepoID  int64  `json:"repo_id"`
+	Number  int64  `json:"number"`
+	Title   string `json:"title"`
+	State   string `json:"state"` // open, closed or merged
+	IsDraft bool   `json:"is_draft"`
+	Author  string `json:"author"`
+	HeadRef string `json:"head_ref"`
+	BaseRef string `json:"base_ref"`
+	HeadSHA string `json:"head_sha"`
+	URL     string `json:"url"`
+	// Times are unix seconds, 0 when not set.
+	CreatedAt int64 `json:"created_at"`
+	UpdatedAt int64 `json:"updated_at"`
+	MergedAt  int64 `json:"merged_at"`
+	ClosedAt  int64 `json:"closed_at"`
+	SyncedAt  int64 `json:"synced_at"`
 }
 
 // UnmergedBranch is a branch whose work has not landed.
@@ -62,6 +108,13 @@ type Rollup struct {
 	// those whose column maps to none.
 	CardsByWorkState map[string]int `json:"cards_by_work_state"`
 	Repos            []RepoRollup   `json:"repos"`
+	// Notes are the noteboard items the project's note links name, todos
+	// among them: a todo linked to a project is one of its next steps.
+	Notes []LinkedNote `json:"notes"`
+	// MissingNoteIDs are note links whose noteboard item is gone.
+	MissingNoteIDs []string `json:"missing_note_ids"`
+	// Suggestions are the model's proposed next steps nobody has decided on.
+	Suggestions []Suggestion `json:"suggestions"`
 }
 
 // BuildRollup works out a project's rollup.
@@ -71,6 +124,9 @@ func BuildRollup(ctx context.Context, store *Store, owners *Owners, id string) (
 		return Rollup{}, err
 	}
 	rollup := Rollup{Project: project, CardsByWorkState: map[string]int{}, Repos: []RepoRollup{}}
+	if rollup.Suggestions, err = store.Suggestions(id, SuggestionProposed); err != nil {
+		return rollup, err
+	}
 	if rollup.Children, err = store.Projects(ProjectFilter{ParentID: id}); err != nil {
 		return rollup, err
 	}
@@ -104,6 +160,9 @@ func BuildRollup(ctx context.Context, store *Store, owners *Owners, id string) (
 		}
 		rollup.Repos = append(rollup.Repos, repo)
 	}
+	if rollup.Notes, rollup.MissingNoteIDs, err = owners.LinkedNotes(ctx, rollup.Links); err != nil {
+		return rollup, err
+	}
 	return rollup, nil
 }
 
@@ -136,27 +195,114 @@ func (owners *Owners) ProjectCards(ctx context.Context, projectID string) ([]Pro
 	return cards, nil
 }
 
-// RepoRollup reads a repo's unmerged branches from work-graph-store and its
-// latest deploy from repo-store's ledger.
+// repoGraph is the part of work-graph-store's graph of a repo a rollup reads.
+type repoGraph struct {
+	DefaultBranch string `json:"default_branch"`
+	Commits       []struct {
+		SHA         string   `json:"sha"`
+		Parents     []string `json:"parents"`
+		CommittedAt int64    `json:"committed_at"`
+		AuthorName  string   `json:"author_name"`
+		Subject     string   `json:"subject"`
+		MadeBy      *struct {
+			SessionID string `json:"session_id"`
+		} `json:"made_by"`
+		OnOriginBranch bool `json:"on_origin_branch"`
+	} `json:"commits"`
+	Branches []struct {
+		Name              string `json:"name"`
+		IsRemote          bool   `json:"is_remote"`
+		HeadSHA           string `json:"head_sha"`
+		CommittedAt       int64  `json:"committed_at"`
+		MergedIntoDefault bool   `json:"merged_into_default"`
+		WorktreePath      string `json:"worktree_path"`
+		Sessions          []struct {
+			SessionID string `json:"session_id"`
+		} `json:"sessions"`
+	} `json:"branches"`
+}
+
+// graphCommitsRead is how many commits a rollup asks work-graph-store for,
+// enough to reach back RecentCommitWindow on a busy repo.
+const graphCommitsRead = 400
+
+// defaultBranchCommits walks the default branch from its head along first
+// parents, newest first, stopping at the first commit older than since or at
+// limit commits.
+func (graph repoGraph) defaultBranchCommits(since int64, limit int) []Commit {
+	commits := []Commit{}
+	bySHA := map[string]int{}
+	for index, commit := range graph.Commits {
+		bySHA[commit.SHA] = index
+	}
+	head := ""
+	for _, branch := range graph.Branches {
+		if !branch.IsRemote && branch.Name == graph.DefaultBranch {
+			head = branch.HeadSHA
+		}
+	}
+	for sha := head; sha != "" && len(commits) < limit; {
+		index, found := bySHA[sha]
+		if !found {
+			break
+		}
+		raw := graph.Commits[index]
+		if raw.CommittedAt < since {
+			break
+		}
+		commit := Commit{SHA: raw.SHA, Subject: raw.Subject, AuthorName: raw.AuthorName, CommittedAt: raw.CommittedAt, OnOriginBranch: raw.OnOriginBranch}
+		if raw.MadeBy != nil {
+			commit.SessionID = raw.MadeBy.SessionID
+		}
+		commits = append(commits, commit)
+		sha = ""
+		if len(raw.Parents) > 0 {
+			sha = raw.Parents[0]
+		}
+	}
+	return commits
+}
+
+func (owners *Owners) repoGraph(ctx context.Context, repoStoreID int64) (repoGraph, error) {
+	var graph repoGraph
+	err := owners.getJSON(ctx, owners.WorkGraphStoreURL+"/repos/"+strconv.FormatInt(repoStoreID, 10)+"/graph?max_commits="+strconv.Itoa(graphCommitsRead), nil, &graph)
+	if err != nil {
+		return graph, fmt.Errorf("graph of repo %d: %w", repoStoreID, err)
+	}
+	return graph, nil
+}
+
+// PullRequests asks repo-store for a repo's pull requests in one state
+// (open, closed, merged or all).
+func (owners *Owners) PullRequests(ctx context.Context, repoStoreID int64, state string) ([]PullRequest, error) {
+	var answer struct {
+		PullRequests []PullRequest `json:"pull_requests"`
+	}
+	err := owners.getJSON(ctx, owners.RepoStoreURL+"/pull-requests?repo_id="+strconv.FormatInt(repoStoreID, 10)+"&state="+url.QueryEscape(state), nil, &answer)
+	if errors.Is(err, ErrNotFound) {
+		// The project links the repo, so repo-store knowing no such repo, or
+		// no such route, is repo-store failing, not the caller's mistake.
+		return nil, fmt.Errorf("%w: repo-store answered 404 for the pull requests of repo %d", ErrOwnerUnavailable, repoStoreID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("pull requests of repo %d: %w", repoStoreID, err)
+	}
+	if answer.PullRequests == nil {
+		return []PullRequest{}, nil
+	}
+	return answer.PullRequests, nil
+}
+
+// RepoRollup reads a repo's unmerged branches and recent commits from
+// work-graph-store, its latest deploy from repo-store's ledger and its open
+// pull requests from repo-store.
 func (owners *Owners) RepoRollup(ctx context.Context, repoStoreID int64, name string) (RepoRollup, error) {
 	rollup := RepoRollup{RepoStoreID: repoStoreID, Name: name, UnmergedBranches: []UnmergedBranch{}}
-	var graph struct {
-		DefaultBranch string `json:"default_branch"`
-		Branches      []struct {
-			Name              string `json:"name"`
-			IsRemote          bool   `json:"is_remote"`
-			HeadSHA           string `json:"head_sha"`
-			CommittedAt       int64  `json:"committed_at"`
-			MergedIntoDefault bool   `json:"merged_into_default"`
-			WorktreePath      string `json:"worktree_path"`
-			Sessions          []struct {
-				SessionID string `json:"session_id"`
-			} `json:"sessions"`
-		} `json:"branches"`
+	graph, err := owners.repoGraph(ctx, repoStoreID)
+	if err != nil {
+		return rollup, err
 	}
-	if err := owners.getJSON(ctx, owners.WorkGraphStoreURL+"/repos/"+strconv.FormatInt(repoStoreID, 10)+"/graph?max_commits=1", nil, &graph); err != nil {
-		return rollup, fmt.Errorf("branches of repo %d: %w", repoStoreID, err)
-	}
+	rollup.RecentCommits = graph.defaultBranchCommits(owners.now().Add(-RecentCommitWindow).Unix(), RecentCommitLimit)
 	for _, branch := range graph.Branches {
 		if branch.IsRemote || branch.MergedIntoDefault || branch.Name == graph.DefaultBranch {
 			continue
@@ -177,6 +323,9 @@ func (owners *Owners) RepoRollup(ctx context.Context, repoStoreID int64, name st
 	}
 	if len(deploys) > 0 {
 		rollup.LatestDeploy = &deploys[0]
+	}
+	if rollup.OpenPullRequests, err = owners.PullRequests(ctx, repoStoreID, "open"); err != nil {
+		return rollup, err
 	}
 	return rollup, nil
 }
@@ -264,6 +413,18 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 				fmt.Fprintf(&text, "%s  %ss: %s\n", indent, strings.ReplaceAll(entityType, "_", " "), strings.Join(owned[entityType], ", "))
 			}
 		}
+		var openSteps []string
+		for _, note := range rollup.Notes {
+			if note.isOpenTodo() {
+				openSteps = append(openSteps, fmt.Sprintf("%s (%s)", note.Title, note.NoteID))
+			}
+		}
+		if len(openSteps) > 0 {
+			fmt.Fprintf(&text, "%s  next steps: %s\n", indent, strings.Join(openSteps, "; "))
+		}
+		if len(rollup.Suggestions) > 0 {
+			fmt.Fprintf(&text, "%s  suggested steps awaiting a decision: %d\n", indent, len(rollup.Suggestions))
+		}
 		if filedSessions > 0 {
 			// Only the count: GET /projects/{id}/links?entity_type=session names them.
 			fmt.Fprintf(&text, "%s  filed sessions: %d\n", indent, filedSessions)
@@ -274,6 +435,12 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 				fmt.Fprintf(&text, ", deployed %s ago", roundedAge(now.Sub(time.Unix(repo.LatestDeploy.CreatedAt, 0))))
 			} else {
 				text.WriteString(", never deployed")
+			}
+			if len(repo.RecentCommits) > 0 {
+				fmt.Fprintf(&text, ", %d commits on the default branch in %dd", len(repo.RecentCommits), int(RecentCommitWindow.Hours()/24))
+			}
+			for _, pullRequest := range repo.OpenPullRequests {
+				fmt.Fprintf(&text, ", open pull request #%d %q", pullRequest.Number, pullRequest.Title)
 			}
 			if len(repo.UnmergedBranches) == 0 {
 				text.WriteString(", no unmerged branches\n")

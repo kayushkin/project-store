@@ -52,3 +52,21 @@ CREATE TABLE IF NOT EXISTS project_changes (
     changed_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS project_changes_by_project ON project_changes (project_id, id);
+
+-- Next steps a model proposed for a project, kept until a person accepts one
+-- (it becomes a noteboard todo linked to the project, note_id) or dismisses
+-- it. A later round of suggestions supersedes the proposals still undecided.
+CREATE TABLE IF NOT EXISTS suggestions (
+    id         TEXT PRIMARY KEY,                  -- suggestion_000001
+    project_id TEXT NOT NULL REFERENCES projects (id),
+    title      TEXT NOT NULL,
+    why        TEXT NOT NULL DEFAULT '',
+    status     TEXT NOT NULL,                     -- proposed | accepted | dismissed | superseded
+    model      TEXT NOT NULL DEFAULT '',          -- the model that answered
+    requested_by TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    decided_by TEXT NOT NULL DEFAULT '',
+    decided_at INTEGER NOT NULL DEFAULT 0,
+    note_id    TEXT NOT NULL DEFAULT ''           -- noteboard todo made on accept
+);
+CREATE INDEX IF NOT EXISTS suggestions_by_project ON suggestions (project_id, status, id);

@@ -4,7 +4,9 @@
 
 `127.0.0.1:8320`, unit `project-store.service`. Projects: what each is for (name, kind `project` or `stream`, goal, what done means, stage, spend target, parent project) and what it owns in other stores — repos, boards, scheduler jobs, services, people, notes, filed sessions — each by the id its own store gave it. Ids are `project_000001`. `CONTRACT.md` is the route table.
 
-It stores nothing that happens in a project. Cards, branches, sessions, deploys and spend are worked out on request (`/projects/{id}/rollup`, `/digest`) from what the project owns and from the cards kanban-store links to it, so they are never stale here.
+It stores nothing that happens in a project. Cards, branches, commits, pull requests, sessions, deploys and spend are worked out on request (`/projects/{id}/rollup`, `/projects/{id}/activity`, `/digest`) from what the project owns and from the cards kanban-store links to it, so they are never stale here. Pull requests come from repo-store, which syncs them from GitHub; this service never calls GitHub.
+
+**Next steps are noteboard todos linked to the project** with a `note` link, the same way a decision note is: noteboard holds what a step says and whether it is done, and `POST /projects/{id}/next-steps` makes the todo (tag `next-step`) and the link in one call. The rollup reads every note link's item back in one `POST /api/items/query`. **Suggested next steps are the one thing stored here that a project did not decide**: `POST /projects/{id}/suggestions` asks llm-bridge-server's one-shot router (`POST /oneshot`, role `PROJECT_STORE_SUGGESTION_MODEL_ROLE`, default `balanced`, caller `project-store-next-step-suggestions`) to read the project's digest, open todos, cards, pull requests and last 14 days of activity, and keeps each proposal (`suggestion_000001`) until a person accepts it — it becomes a next step — or dismisses it. A new round supersedes the undecided proposals of the last.
 
 # How it works
 

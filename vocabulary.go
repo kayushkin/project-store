@@ -26,7 +26,7 @@ const (
 	EntitySchedulerJob = "scheduler_job" // scheduler's numeric job id
 	EntityService      = "service"       // healthcheck's check name, its key there
 	EntityPrincipal    = "principal"     // principal-store id, principal_000001
-	EntityNote         = "note"          // noteboard item uuid: a decision, a design
+	EntityNote         = "note"          // noteboard item uuid: a decision, a design, a next step
 	EntitySession      = "session"       // llm-bridge-server session id, br_…
 )
 
@@ -44,7 +44,7 @@ var EntityTypes = []EntityTypeInfo{
 	{EntitySchedulerJob, "scheduler", "A scheduled job that does the project's work; the scheduler's numeric job id."},
 	{EntityService, "healthcheck", "A running service the project keeps up; healthcheck's check name."},
 	{EntityPrincipal, "principal-store", "A person or group the project serves or works with; principal-store's id."},
-	{EntityNote, "noteboard", "A note that records a decision or a design; the noteboard item's uuid."},
+	{EntityNote, "noteboard", "A note that records a decision or a design, or a todo that is one of the project's next steps; the noteboard item's uuid."},
 	{EntitySession, "llm-bridge-server", "A session filed under the project: a chat about it, or a worker on it; llm-bridge-server's id. Filing is for sessions no card or branch ties to the project already."},
 }
 

@@ -41,6 +41,8 @@ func main() {
 		WorkGraphStoreURL:       settings.String(projectstore.SettingWorkGraphStoreURL),
 		BridgeURL:               settings.String(projectstore.SettingBridgeURL),
 		BridgeServiceToken:      settings.String(projectstore.SettingBridgeServiceToken),
+		SuggestionModelRole:     settings.String(projectstore.SettingSuggestionModelRole),
+		ModelHTTP:               &http.Client{Timeout: 5 * time.Minute},
 	}
 
 	mux := http.NewServeMux()

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 // ErrOwnerUnavailable means the store that owns an entity could not answer, so
@@ -29,6 +30,14 @@ type Owners struct {
 	WorkGraphStoreURL       string
 	BridgeURL               string
 	BridgeServiceToken      string
+	// SuggestionModelRole is the model-store role asked for suggested next
+	// steps, through llm-bridge-server's one-shot router.
+	SuggestionModelRole string
+	// ModelHTTP carries the one-shot model call, which takes far longer than
+	// a store lookup.
+	ModelHTTP *http.Client
+	// Clock is nil outside tests.
+	Clock func() time.Time
 }
 
 // BridgeServiceTokenHeader is how llm-bridge-server recognises an internal service.

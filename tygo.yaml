@@ -9,3 +9,6 @@ packages:
       - "store.go"
       - "rollup.go"
       - "vocabulary.go"
+      - "notes.go"
+      - "activity.go"
+      - "suggestions.go"
