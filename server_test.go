@@ -14,6 +14,9 @@ import (
 
 // fakeOwners answers like the real stores: repo 15 is "dash", board b1 is
 // "Support Desk" (and only with the service token), anything else is 404.
+// repoFifteenName is repo 15's name in the fake repo-store; a test renames it.
+var repoFifteenName = func() string { return "dash" }
+
 func fakeOwners(t *testing.T) *Owners {
 	t.Helper()
 	// Commits a day apart on main, newest first; the third is older than
@@ -102,7 +105,7 @@ func fakeOwners(t *testing.T) *Owners {
 		}
 		switch request.URL.Path {
 		case "/repos/15":
-			json.NewEncoder(writer).Encode(map[string]any{"id": 15, "name": "dash"})
+			json.NewEncoder(writer).Encode(map[string]any{"id": 15, "name": repoFifteenName()})
 		case "/api/boards/b1":
 			if request.Header.Get(KanbanServiceTokenHeader) != "service-token" {
 				http.Error(writer, "no token", http.StatusUnauthorized)
@@ -388,4 +391,26 @@ func TestNextStepsAreLinkedTodosAndSuggestionsWaitForAPerson(t *testing.T) {
 	c.do("GET", "/projects/project_000001/activity?days=0", "", http.StatusBadRequest)
 	c.do("GET", "/projects/project_000001/activity?since=1", "", http.StatusBadRequest)
 	c.do("GET", "/projects/project_000404/activity", "", http.StatusNotFound)
+}
+
+func TestARenamedRepoIsNamedAsRepoStoreNamesItNow(t *testing.T) {
+	c := newClient(t)
+	c.do("POST", "/projects", `{"name":"Orchestrator"}`, http.StatusCreated)
+	c.do("POST", "/projects/project_000001/links", `{"entity_type":"repo","entity_ref":"15"}`, http.StatusCreated)
+	repoFifteenName = func() string { return "dash-renamed" }
+	t.Cleanup(func() { repoFifteenName = func() string { return "dash" } })
+
+	repo := c.do("GET", "/projects/project_000001/rollup", "", http.StatusOK)["repos"].([]any)[0].(map[string]any)
+	if repo["name"] != "dash-renamed" {
+		t.Errorf("rollup names the repo %v, want its name now", repo["name"])
+	}
+	for _, raw := range c.do("GET", "/projects/project_000001/activity", "", http.StatusOK)["events"].([]any) {
+		event := raw.(map[string]any)
+		if event["kind"] == ActivityCommitLanded && event["repo_name"] != "dash-renamed" {
+			t.Fatalf("a commit event names the repo %v", event["repo_name"])
+		}
+		if event["kind"] == ActivityLinkAdded && event["entity_type"] == "repo" && event["label"] != "dash-renamed" {
+			t.Fatalf("the link event names the repo %v", event["label"])
+		}
+	}
 }

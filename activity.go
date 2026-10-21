@@ -97,9 +97,26 @@ func BuildActivity(ctx context.Context, store *Store, owners *Owners, projectID 
 	if err != nil {
 		return nil, err
 	}
+	repoNames := map[string]string{}
+	for _, link := range links {
+		if link.EntityType != EntityRepo {
+			continue
+		}
+		repoStoreID, err := strconv.ParseInt(link.EntityRef, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("repo link %d holds %q, not a repo-store id", link.ID, link.EntityRef)
+		}
+		if repoNames[link.EntityRef], err = owners.RepoName(ctx, repoStoreID); err != nil {
+			return nil, err
+		}
+	}
 	for _, link := range links {
 		if link.CreatedAt >= sinceUnix {
 			event := ActivityEvent{Kind: ActivityLinkAdded, At: link.CreatedAt, Actor: link.CreatedBy, EntityType: link.EntityType, EntityRef: link.EntityRef, Label: link.Label}
+			if link.EntityType == EntityRepo {
+				// The repo's name now, not when it was linked.
+				event.Label = repoNames[link.EntityRef]
+			}
 			if link.EntityType == EntitySession {
 				event.SessionID = link.EntityRef
 			}
@@ -156,7 +173,7 @@ func BuildActivity(ctx context.Context, store *Store, owners *Owners, projectID 
 		if err != nil {
 			return nil, fmt.Errorf("repo link %d holds %q, not a repo-store id", link.ID, link.EntityRef)
 		}
-		repoEvents, err := owners.repoActivity(ctx, repoStoreID, link.Label, sinceUnix)
+		repoEvents, err := owners.repoActivity(ctx, repoStoreID, repoNames[link.EntityRef], sinceUnix)
 		if err != nil {
 			return nil, err
 		}

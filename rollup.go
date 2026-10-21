@@ -154,7 +154,11 @@ func BuildRollup(ctx context.Context, store *Store, owners *Owners, id string) (
 		if err != nil {
 			return rollup, fmt.Errorf("repo link %d holds %q, not a repo-store id", link.ID, link.EntityRef)
 		}
-		repo, err := owners.RepoRollup(ctx, repoStoreID, link.Label)
+		name, err := owners.RepoName(ctx, repoStoreID)
+		if err != nil {
+			return rollup, err
+		}
+		repo, err := owners.RepoRollup(ctx, repoStoreID, name)
 		if err != nil {
 			return rollup, err
 		}
@@ -270,6 +274,24 @@ func (owners *Owners) repoGraph(ctx context.Context, repoStoreID int64) (repoGra
 		return graph, fmt.Errorf("graph of repo %d: %w", repoStoreID, err)
 	}
 	return graph, nil
+}
+
+// RepoName asks repo-store for a repo's name now. A link's label is the
+// name when the repo was linked, and a repo can be renamed since (producer
+// became orchestrator), so anything that names a repo to the reader — a
+// `repo:<name>` or `<repo>@<sha>` chip above all — takes it from here.
+func (owners *Owners) RepoName(ctx context.Context, repoStoreID int64) (string, error) {
+	var repo struct {
+		Name string `json:"name"`
+	}
+	err := owners.getJSON(ctx, owners.RepoStoreURL+"/repos/"+strconv.FormatInt(repoStoreID, 10), nil, &repo)
+	if errors.Is(err, ErrNotFound) {
+		return "", fmt.Errorf("%w: repo-store has no repo %d, which a project link names", ErrOwnerUnavailable, repoStoreID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("name of repo %d: %w", repoStoreID, err)
+	}
+	return repo.Name, nil
 }
 
 // PullRequests asks repo-store for a repo's pull requests in one state
