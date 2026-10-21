@@ -36,15 +36,15 @@ type RepoRollup struct {
 	// LatestDeploy is nil when the ledger has no deploy of the repo.
 	LatestDeploy *Deploy `json:"latest_deploy"`
 	// RecentCommits are the default branch's commits of the last
-	// RecentCommitWindow, newest first, following first parents, at most
+	// RecentCommitWindowDays days, newest first, following first parents, at most
 	// RecentCommitLimit of them.
 	RecentCommits []Commit `json:"recent_commits"`
 	// OpenPullRequests are repo-store's open pull requests of the repo.
 	OpenPullRequests []PullRequest `json:"open_pull_requests"`
 }
 
-// RecentCommitWindow is how far back a rollup's recent commits reach.
-const RecentCommitWindow = 14 * 24 * time.Hour
+// RecentCommitWindowDays is how far back a rollup's recent commits reach.
+const RecentCommitWindowDays = 14
 
 // RecentCommitLimit caps a rollup's recent commits for one repo.
 const RecentCommitLimit = 50
@@ -223,7 +223,7 @@ type repoGraph struct {
 }
 
 // graphCommitsRead is how many commits a rollup asks work-graph-store for,
-// enough to reach back RecentCommitWindow on a busy repo.
+// enough to reach back RecentCommitWindowDays on a busy repo.
 const graphCommitsRead = 400
 
 // defaultBranchCommits walks the default branch from its head along first
@@ -302,7 +302,7 @@ func (owners *Owners) RepoRollup(ctx context.Context, repoStoreID int64, name st
 	if err != nil {
 		return rollup, err
 	}
-	rollup.RecentCommits = graph.defaultBranchCommits(owners.now().Add(-RecentCommitWindow).Unix(), RecentCommitLimit)
+	rollup.RecentCommits = graph.defaultBranchCommits(owners.now().AddDate(0, 0, -RecentCommitWindowDays).Unix(), RecentCommitLimit)
 	for _, branch := range graph.Branches {
 		if branch.IsRemote || branch.MergedIntoDefault || branch.Name == graph.DefaultBranch {
 			continue
@@ -437,7 +437,7 @@ func DigestText(projects []Project, rollups map[string]Rollup, now time.Time) st
 				text.WriteString(", never deployed")
 			}
 			if len(repo.RecentCommits) > 0 {
-				fmt.Fprintf(&text, ", %d commits on the default branch in %dd", len(repo.RecentCommits), int(RecentCommitWindow.Hours()/24))
+				fmt.Fprintf(&text, ", %d commits on the default branch in %dd", len(repo.RecentCommits), RecentCommitWindowDays)
 			}
 			for _, pullRequest := range repo.OpenPullRequests {
 				fmt.Fprintf(&text, ", open pull request #%d %q", pullRequest.Number, pullRequest.Title)

@@ -247,7 +247,7 @@ func SuggestNextSteps(ctx context.Context, store *Store, owners *Owners, project
 		return nil, err
 	}
 	now := owners.now()
-	activity, err := BuildActivity(ctx, store, owners, projectID, now.Add(-DefaultActivityDays*24*time.Hour))
+	activity, err := BuildActivity(ctx, store, owners, projectID, now.AddDate(0, 0, -DefaultActivityDays))
 	if err != nil {
 		return nil, err
 	}

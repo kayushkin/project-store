@@ -17,7 +17,7 @@ import (
 func fakeOwners(t *testing.T) *Owners {
 	t.Helper()
 	// Commits a day apart on main, newest first; the third is older than
-	// RecentCommitWindow, so it is neither recent nor activity.
+	// RecentCommitWindowDays days, so it is neither recent nor activity.
 	now := time.Now().Unix()
 	day := int64(24 * 60 * 60)
 	// noteboard's items, by id: one open todo, one done, one note.
