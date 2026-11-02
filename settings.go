@@ -78,7 +78,7 @@ func SettingDefinitions() []servicesettings.Definition {
 			"llm-bridge-server. A session filed under a project is checked there."),
 		{Key: SettingBridgeServiceToken, EnvironmentVariable: "LLMBRIDGE_SERVICE_TOKEN", Kind: msg.ServiceSettingKindSecret, ValueType: msg.ServiceSettingValueTypeString, Required: true,
 			Description: "The token llm-bridge-server takes from an internal service. Without it every session check is 401, so the service refuses to start."},
-		{Key: SettingSuggestionModelRole, EnvironmentVariable: "PROJECT_STORE_SUGGESTION_MODEL_ROLE", Kind: msg.ServiceSettingKindBehaviour, ValueType: msg.ServiceSettingValueTypeString, Default: "balanced",
+		{Key: SettingSuggestionModelRole, EnvironmentVariable: "PROJECT_STORE_SUGGESTION_MODEL_ROLE", Kind: msg.ServiceSettingKindBehavior, ValueType: msg.ServiceSettingValueTypeString, Default: "balanced",
 			Description: "The model-store role llm-bridge-server's one-shot router asks for a project's suggested next steps. Empty refuses suggestions."},
 	}
 }
