@@ -40,10 +40,10 @@ type Owners struct {
 	Clock func() time.Time
 }
 
-// BridgeServiceTokenHeader is how llm-bridge-server recognises an internal service.
+// BridgeServiceTokenHeader is how llm-bridge-server recognizes an internal service.
 const BridgeServiceTokenHeader = "X-LLM-Bridge-Service-Token"
 
-// KanbanServiceTokenHeader is how kanban-store recognises an internal service.
+// KanbanServiceTokenHeader is how kanban-store recognizes an internal service.
 const KanbanServiceTokenHeader = "X-Kanban-Store-Service-Token"
 
 // getJSON fetches a URL into target. A 404 is ErrNotFound; anything else that
